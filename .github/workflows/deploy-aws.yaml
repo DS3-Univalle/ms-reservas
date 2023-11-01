@@ -1,0 +1,41 @@
+name: Deploy App to Kubernetes on AWS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up kubectl
+        uses: kubeactions/setup-kubectl@v1
+        with:
+          version: 'latest' # Especifica la versión de kubectl que deseas utilizar
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Build and Push Docker Image
+        run: |
+          # Reemplaza estos comandos con los comandos específicos para tu aplicación y Dockerfile
+          docker build -t your-image:latest .
+          docker tag your-image:latest ${{ secrets.AWS_ECR_REPOSITORY }}:latest
+          docker login -u AWS -p ${{ secrets.AWS_ACCESS_KEY_ID }} https://${{ secrets.AWS_DEFAULT_REGION }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com
+          docker push ${{ secrets.AWS_ECR_REPOSITORY }}:latest
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deploy-aws.yaml # Reemplaza con el nombre de tu archivo de implementación de Kubernetes
