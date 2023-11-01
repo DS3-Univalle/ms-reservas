@@ -1,41 +1,36 @@
-name: Deploy App to Kubernetes on AWS
+name: Deploy properties to Amazon ECR
 
 on:
   push:
     branches:
-      - main
+      - "main"
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     environment: production
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Set up kubectl
-        uses: kubeactions/setup-kubectl@v1
-        with:
-          version: 'latest' # Especifica la versión de kubectl que deseas utilizar
-
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@master
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
-
-      - name: Build and Push Docker Image
-        run: |
-          # Reemplaza estos comandos con los comandos específicos para tu aplicación y Dockerfile
-          docker build -t your-image:latest .
-          docker tag your-image:latest ${{ secrets.AWS_ECR_REPOSITORY }}:latest
-          docker login -u AWS -p ${{ secrets.AWS_ACCESS_KEY_ID }} https://${{ secrets.AWS_DEFAULT_REGION }}.dkr.ecr.${{ secrets.AWS_DEFAULT_REGION }}.amazonaws.com
-          docker push ${{ secrets.AWS_ECR_REPOSITORY }}:latest
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
         env:
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-
-      - name: Deploy to Kubernetes
-        run: kubectl apply -f deploy-aws.yaml # Reemplaza con el nombre de tu archivo de implementación de Kubernetes
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build -t $ECR_REGISTRY/${{secrets.AWS_ECR_REPOSITORY}}:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/${{secrets.AWS_ECR_REPOSITORY}}:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/${{secrets.AWS_ECR_REPOSITORY}}:$IMAGE_TAG" >> $GITHUB_OUTPUT
